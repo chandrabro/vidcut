@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Toolkit</title>
+<style>
+:root{--bg:#eef1f4;--card:#fff;--ink:#14202b;--mute:#5d6b78;--line:#d5dce3;--accent:#0f6b5c;--over:#f2a93b;--bar:#bcd9d3}
+@media (prefers-color-scheme:dark){:root{--bg:#10171d;--card:#18222b;--ink:#e8eef3;--mute:#93a3b0;--line:#2b3a46;--accent:#4fc4ae;--over:#e0a040;--bar:#24574d}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:24px 16px}
+main{max-width:780px;margin:0 auto;display:grid;gap:16px}
+h1{font-size:1.6rem;margin:0}h2{font-size:1.1rem;margin:0 0 10px}
+p.sub{margin:4px 0 0;color:var(--mute)}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+label{display:block;font-weight:600;margin-bottom:4px}
+input[type=number],select{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:inherit;font:inherit}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.drop{display:block;border:2px dashed var(--line);border-radius:8px;padding:24px;text-align:center;cursor:pointer;color:var(--mute)}
+.drop:hover,.drop.on{border-color:var(--accent);color:var(--ink)}
+.drop input{display:none}
+button{font:inherit;font-weight:600;padding:10px 18px;border:0;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer}
+button.alt{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.alt[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--over);outline-offset:2px}
+.tabs{display:flex;gap:8px}
+.check{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:400}
+.check input{margin-top:5px}
+.tl{margin-top:14px;display:grid;gap:4px}
+.seg{position:relative;height:14px;background:var(--line);border-radius:3px}
+.seg i{position:absolute;top:0;bottom:0;background:var(--bar);border-radius:3px}
+.seg b{position:absolute;top:0;bottom:0;background:var(--over)}
+.list{display:grid;gap:6px;margin:12px 0 0;padding:0;list-style:none}
+.list li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-variant-numeric:tabular-nums}
+.list a{color:var(--accent);font-weight:600}
+.list .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list input{width:84px;padding:6px}
+.thumb{width:44px;height:34px;object-fit:cover;border-radius:4px;background:var(--line);display:grid;place-items:center;font-size:.65rem;color:var(--mute)}
+.x{padding:4px 10px;background:transparent;color:var(--mute);border:1px solid var(--line)}
+progress{width:100%;height:10px;margin-top:12px}
+.note{color:var(--mute);font-size:.9rem}
+.err{color:#c0392b;font-weight:600}
+video{width:100%;border-radius:8px;margin-top:10px;background:#000}
+.sp{margin-top:14px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Video Toolkit</h1>
+    <p class="sub">Runs in your browser. Nothing is uploaded.</p>
+  </header>
+  <div class="tabs">
+    <button class="alt" data-tab="split" aria-pressed="true">Split &amp; Transitions</button>
+    <button class="alt" data-tab="show" aria-pressed="false">Slideshow Maker</button>
+  </div>
+
+  <div id="tab-split" style="display:grid;gap:16px">
+    <section>
+      <label class="drop" id="drop"><span id="dropText">Choose a video or drop it here</span><input type="file" id="file" accept="video/*,.mkv"></label>
+      <div id="info" class="note" hidden></div>
+    </section>
+    <section id="settings" hidden>
+      <h2>Mode</h2>
+      <label class="check"><input type="radio" name="mode" value="cut" checked><span>Cut into separate clips (each starts a few seconds before the last one ended)</span></label>
+      <label class="check"><input type="radio" name="mode" value="join"><span>Keep one full video and add a transition at every interval (slow, re-encodes)</span></label>
+      <div class="row sp">
+        <div><label for="interval">Interval (minutes)</label><input type="number" id="interval" value="5" min="0.1" step="0.5"></div>
+        <div id="ovBox"><label for="overlap">Overlap (seconds)</label><input type="number" id="overlap" value="10" min="0" step="1"></div>
+      </div>
+      <div class="row" id="joinOpts" hidden>
+        <div><label for="trans">Transition</label><select id="trans"></select></div>
+        <div><label for="tdur">Transition length (seconds)</label><input type="number" id="tdur" value="1" min="0.2" step="0.2"></div>
+        <div><label for="jh">Output height</label><select id="jh"><option value="480">480p (fastest)</option><option value="720" selected>720p</option><option value="1080">1080p</option></select></div>
+      </div>
+      <label class="check" id="preciseBox"><input type="checkbox" id="precise"><span>Precise cuts (re-encodes, much slower). Off = fast copy, cuts snap to the nearest earlier keyframe.</span></label>
+      <div id="plan"></div>
+      <div id="err" class="err" hidden></div>
+      <p><button id="go">Split video</button></p>
+      <progress id="bar" max="1" value="0" hidden></progress>
+      <div id="status" class="note"></div>
+      <ul class="list" id="out"></ul>
+      <p><button id="zip" hidden>Download all as ZIP</button></p>
+      <div id="full"></div>
+    </section>
+  </div>
+
+  <div id="tab-show" hidden style="display:grid;gap:16px">
+    <section>
+      <h2>1. Add images and video clips</h2>
+      <label class="drop"><span>Choose images (JPG, PNG, WebP) and video clips</span><input type="file" id="media" accept="image/*,video/*" multiple></label>
+      <div class="row sp">
+        <div><label for="sort">Arrange by file name</label><select id="sort"><option value="added">Order added</option><option value="asc">Name A to Z (1, 2, 10)</option><option value="desc">Name Z to A</option></select></div>
+        <div><label for="defdur">Seconds per image (default)</label><input type="number" id="defdur" value="5" min="0.5" step="0.5"></div>
+      </div>
+      <p class="note">Type a number in an image's box to give that slide its own time. Leave it empty to use the default. Video clips play their full length.</p>
+      <ul class="list" id="items"></ul>
+    </section>
+    <section>
+      <h2>2. Audio</h2>
+      <div class="row">
+        <div><label for="bg">Background music</label><input type="file" id="bg" accept="audio/*"><label class="note" for="bgv">Volume <input type="range" id="bgv" min="0" max="100" value="35"></label></div>
+        <div><label for="vo">Voice / audio track</label><input type="file" id="vo" accept="audio/*"><label class="note" for="vov">Volume <input type="range" id="vov" min="0" max="100" value="100"></label></div>
+      </div>
+      <p class="note">Music loops or is trimmed to fit the video and fades out at the end. Sound inside video clips is not kept.</p>
+    </section>
+    <section>
+      <h2>3. Look</h2>
+      <div class="row">
+        <div><label for="strans">Transition between items</label><select id="strans"></select></div>
+        <div><label for="stdur">Transition length (seconds)</label><input type="number" id="stdur" value="1" min="0.2" step="0.2"></div>
+        <div><label for="size">Output size</label><select id="size"><option value="1280x720" selected>1280x720 (landscape)</option><option value="1920x1080">1920x1080 (landscape)</option><option value="854x480">854x480 (fast)</option><option value="720x1280">720x1280 (vertical)</option><option value="720x720">720x720 (square)</option></select></div>
+      </div>
+      <div id="serr" class="err" hidden></div>
+      <p><button id="sgo">Create video</button></p>
+      <progress id="sbar" max="1" value="0" hidden></progress>
+      <div id="sstatus" class="note"></div>
+      <div id="sfull"></div>
+    </section>
+  </div>
+</main>
+<script type="module" src="/main.js"></script>
+</body>
+</html>
